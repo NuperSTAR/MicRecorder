@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black-themed Microphone Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #000;
+            color: #fff;
+        }
+
+        h1 {
+            color: #007BFF;
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        select, button {
+            padding: 10px;
+            margin: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            outline: none;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #007BFF;
+        }
+
+        button:disabled {
+            background-color: #444;
+            cursor: not-allowed;
+        }
+
+        .audio-player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            width: 300px;
+        }
+
+        audio {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .audio-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .play-pause-button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+
+        .play-pause-button:hover {
+            background-color: #0056b3;
+        }
+
+        .playback-speed-control {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Black-themed Microphone Recorder</h1>
+
+    <div id="controls">
+        <select id="inputDevice">
+            <option value="" disabled selected>Select Microphone</option>
+        </select>
+
+        <button id="startRecording">Start Recording</button>
+        <button id="stopRecording" disabled>Stop Recording</button>
+
+        <div class="audio-player">
+            <audio id="audioPlayer" controls></audio>
+            <div class="audio-controls">
+                <button class="play-pause-button" id="playPauseButton" disabled>&#9654;</button>
+                <button class="play-pause-button" id="stopButton" disabled>&#9724;</button>
+            </div>
+            <div class="playback-speed-control">
+                Playback Speed:
+                <input type="range" id="speedControl" min="0.5" max="2" step="0.1" value="1">
+                <span id="speedValue">1x</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const inputDeviceSelect = document.getElementById('inputDevice');
+        const startRecordingButton = document.getElementById('startRecording');
+        const stopRecordingButton = document.getElementById('stopRecording');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const stopButton = document.getElementById('stopButton');
+        const speedControl = document.getElementById('speedControl');
+        const speedValue = document.getElementById('speedValue');
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function getMicrophoneDevices() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            devices.forEach(device => {
+                if (device.kind === 'audioinput') {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Microphone ${inputDeviceSelect.options.length + 1}`;
+                    inputDeviceSelect.appendChild(option);
+                }
+            });
+        }
+
+        startRecordingButton.addEventListener('click', async () => {
+            const deviceId = inputDeviceSelect.value;
+            if (!deviceId) {
+                alert('Please select a microphone device.');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId } });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioPlayer.src = URL.createObjectURL(audioBlob);
+                    audioChunks = [];
+                    startRecordingButton.disabled = false;
+                    stopRecordingButton.disabled = true;
+                    playPauseButton.disabled = false;
+                    stopButton.disabled = false;
+                };
+
+                mediaRecorder.start();
+                startRecordingButton.disabled = true;
+                stopRecordingButton.disabled = false;
+                playPauseButton.disabled = true;
+                stopButton.disabled = true;
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+            }
+        });
+
+        stopRecordingButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+        });
+
+        let audioPlaying = false;
+        playPauseButton.addEventListener('click', () => {
+            if (!audioPlaying) {
+                audioPlayer.play();
+                playPauseButton.textContent = '❚❚';
+            } else {
+                audioPlayer.pause();
+                playPauseButton.textContent = '▶';
+            }
+            audioPlaying = !audioPlaying;
+        });
+
+        stopButton.addEventListener('click', () => {
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            playPauseButton.textContent = '▶';
+            audioPlaying = false;
+        });
+
+        speedControl.addEventListener('input', () => {
+            audioPlayer.playbackRate = speedControl.value;
+            speedValue.textContent = `${speedControl.value}x`;
+        });
+
+        getMicrophoneDevices();
+    </script>
+</body>
+</html>
